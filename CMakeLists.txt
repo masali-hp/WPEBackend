@@ -10,6 +10,7 @@ endif()
 set(WPE_INCLUDE_DIRECTORIES
     "include"
     "src"
+    ${VULKAN_INCLUDE_DIRS}
 )
 
 set(WPE_LIBRARIES
@@ -23,6 +24,7 @@ set(WPE_SOURCES
     src/pasteboard-generic.cpp
     src/pasteboard-noop.cpp
     src/renderer-backend-egl.c
+    src/renderer-backend-vulkan.c
     src/renderer-host.c
     src/view-backend.c
 )
@@ -32,6 +34,7 @@ set(WPE_PUBLIC_HEADERS
   include/wpe/loader.h
   include/wpe/pasteboard.h
   include/wpe/renderer-backend-egl.h
+  include/wpe/renderer-backend-vulkan.h
   include/wpe/renderer-host.h
   include/wpe/view-backend.h
 )
