@@ -26,7 +26,14 @@
 
 #include "loader-private.h"
 
+#ifdef WIN32
+#include <windows.h>
+typedef HMODULE LibraryHandle;
+#else
 #include <dlfcn.h>
+#include <stdarg.h>
+typedef void * LibraryHandle;
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -61,40 +68,103 @@ wpe_loader_set_impl_library_name(const char* impl_library_name)
 }
 #endif
 
+void report_error(const char * fmt, ...)
+{
+    char msg[512];
+    va_list valist;
+    va_start(valist, fmt);
+    size_t count = vsnprintf(msg, sizeof(msg), fmt, valist);
+    fwrite(msg, sizeof(char), count, stderr);
+#ifdef WIN32
+    // cause nobody pays attention to stderr on windows...
+    MessageBoxA(NULL, msg, "Error", MB_ICONERROR | MB_OK);
+#endif
+    va_end(valist);
+}
+
+#ifdef WIN32
+void report_last_error(const char * message)
+{
+    //https://stackoverflow.com/questions/1387064/how-to-get-the-error-message-from-the-error-code-returned-by-getlasterror
+    DWORD errorMessageID = GetLastError();
+    if (errorMessageID) {
+        LPSTR messageBuffer = NULL;
+        size_t size = FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+            NULL, errorMessageID, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&messageBuffer, 0, NULL);
+        report_error("wpe: %s: %s\n", message, messageBuffer);
+        LocalFree(messageBuffer);
+    }
+}
+#endif
+
+LibraryHandle openlibrary(const char * library_name, const char * context)
+{
+#ifdef WIN32
+    LibraryHandle handle = LoadLibraryA(library_name);
+    if (!handle) {
+        char message[256];
+        sprintf(message, "Failed to load library %s (%s)", library_name, context);
+        report_last_error(message);
+		abort();
+    }
+#else
+    LibraryHandle handle = dlopen(library_name, RTLD_NOW);
+    if (!handle) {
+        report_error("wpe: could not load %s: %s\n", context, dlerror());
+		abort();
+    }
+#endif
+    return handle;
+}
+
+void * loadsymbol(LibraryHandle library, const char * symbol)
+{
+#ifdef WIN32
+    void * ret = GetProcAddress(library, symbol);
+    if (!ret) {
+        char message[256];
+        sprintf(message, "Failed to load symbol %s", symbol);
+        report_last_error(message);
+    }
+    return ret;
+#else
+    return dlsym(library, symbol);
+#endif
+}
+
 void
 load_impl_library()
 {
 #ifdef WPE_BACKEND
-    s_impl_library = dlopen(WPE_BACKEND, RTLD_NOW);
-    if (!s_impl_library) {
-        fprintf(stderr, "wpe: could not load compile-time defined WPE_BACKEND: %s\n", dlerror());
-        abort();
-    }
+    s_impl_library = openlibrary(WPE_BACKEND, "compile-time defined WPE_BACKEND");
 #else
 #ifndef NDEBUG
     // Get the impl library from an environment variable, if available.
     char* env_library_name = getenv("WPE_BACKEND_LIBRARY");
     if (env_library_name) {
-        s_impl_library = dlopen(env_library_name, RTLD_NOW);
-        if (!s_impl_library) {
-            fprintf(stderr, "wpe: could not load specified WPE_BACKEND_LIBRARY: %s\n", dlerror());
-            abort();
-        }
+        char message[256];
+        snprintf(message, sizeof(message), "specified WPE_BACKEND_LIBRARY(%s)", env_library_name);
+        s_impl_library = openlibrary(env_library_name, message);
         wpe_loader_set_impl_library_name(env_library_name);
     }
 #endif
     if (!s_impl_library) {
         // Load libWPEBackend-default.so by ... default.
-        s_impl_library = dlopen("libWPEBackend-default.so", RTLD_NOW);
-        if (!s_impl_library) {
-            fprintf(stderr, "wpe: could not load the impl library. Is there any backend installed?: %s\n", dlerror());
-            abort();
-        }
-        wpe_loader_set_impl_library_name("libWPEBackend-default.so");
-    }
+#ifdef WIN32
+        static const char library_name[] = "WPEBackend-default.dll";
+#else
+        static const char library_name[] = "libWPEBackend-default.so";
 #endif
 
-    s_impl_loader = dlsym(s_impl_library, "_wpe_loader_interface");
+        s_impl_library = openlibrary(library_name, "Default backend library");
+		wpe_loader_set_impl_library_name(library_name);
+    }
+#endif
+    if (!s_impl_library) {
+        abort();
+    }
+
+    s_impl_loader = loadsymbol(s_impl_library, "_wpe_loader_interface");
 }
 
 bool
@@ -114,14 +184,13 @@ wpe_loader_init(const char* impl_library_name)
         return true;
     }
 
-    s_impl_library = dlopen(impl_library_name, RTLD_NOW);
+    s_impl_library = openlibrary(impl_library_name, "interface loaded library (wpe_loader_init)");
     if (!s_impl_library) {
-        fprintf(stderr, "wpe_loader_init could not load the library '%s': %s\n", impl_library_name, dlerror());
         return false;
     }
     wpe_loader_set_impl_library_name(impl_library_name);
 
-    s_impl_loader = dlsym(s_impl_library, "_wpe_loader_interface");
+    s_impl_loader = loadsymbol(s_impl_library, "_wpe_loader_interface");
     return true;
 #else
     return false;
@@ -152,9 +221,9 @@ wpe_load_object(const char* object_name)
         return s_impl_loader->load_object(object_name);
     }
 
-    void* object = dlsym(s_impl_library, object_name);
+    void* object = loadsymbol(s_impl_library, object_name);
     if (!object)
-        fprintf(stderr, "wpe_load_object: failed to load object with name '%s'\n", object_name);
+        report_error("wpe_load_object: failed to load object with name '%s'\n", object_name);
 
     return object;
 }

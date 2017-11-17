@@ -29,7 +29,9 @@ include(DistTargets)
 include(GNUInstallDirs)
 
 find_package(EGL REQUIRED)
-find_package(Libxkbcommon REQUIRED)
+if (UNIX)
+    find_package(Libxkbcommon REQUIRED)
+endif ()
 
 add_definitions(${EGL_DEFINITIONS})
 add_definitions(-DWPE_COMPILATION)
@@ -45,14 +47,14 @@ set(WPE_INCLUDE_DIRECTORIES
     ${EGL_INCLUDE_DIRS}
 )
 
-set(WPE_LIBRARIES
-    dl
-    ${LIBXKBCOMMON_LIBRARIES}
-)
+if (UNIX)
+    set(WPE_LIBRARIES
+        dl
+        ${LIBXKBCOMMON_LIBRARIES}
+    )
+endif ()
 
 set(WPE_SOURCES
-    src/input.c
-    src/key-unicode.c
     src/loader.c
     src/pasteboard.c
     src/pasteboard-generic.cpp
@@ -62,6 +64,13 @@ set(WPE_SOURCES
     src/version.c
     src/view-backend.c
 )
+
+if (UNIX)
+    list(APPEND WPE_SOURCES
+        src/input.c
+        src/key-unicode.c
+	)
+endif()
 
 set(WPE_PUBLIC_HEADERS
   ${DERIVED_SOURCES_DIR}/version.h

@@ -37,8 +37,10 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#if !defined(_WINDOWS) && !defined(_WIN32)
 #include <xkbcommon/xkbcommon.h>
 #include <xkbcommon/xkbcommon-compose.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -123,6 +125,7 @@ struct wpe_input_touch_event {
     uint32_t modifiers;
 };
 
+#if !defined(_WINDOWS) && !defined(_WIN32)
 
 struct wpe_input_xkb_context;
 
@@ -183,6 +186,8 @@ wpe_key_code_to_unicode (uint32_t);
 WPE_EXPORT
 uint32_t
 wpe_unicode_to_key_code (uint32_t);
+
+#endif
 
 #ifdef __cplusplus
 }
