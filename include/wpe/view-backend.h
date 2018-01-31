@@ -58,7 +58,7 @@ struct wpe_view_backend_interface {
     void (*initialize)(void*);
     int (*get_renderer_host_fd)(void*);
 
-    void (*_wpe_reserved0)(void);
+    void (*set_size_and_style)(void *, int width, int height, int style);
     void (*_wpe_reserved1)(void);
     void (*_wpe_reserved2)(void);
     void (*_wpe_reserved3)(void);
@@ -72,6 +72,13 @@ wpe_view_backend_create();
 WPE_EXPORT
 struct wpe_view_backend*
 wpe_view_backend_create_with_backend_interface(struct wpe_view_backend_interface*, void*);
+
+#define WPE_BACKEND_STYLE_NO_CHANGE -1
+#define WPE_BACKEND_STYLE_NO_BORDER 0
+#define WPE_BACKEND_STYLE_BORDER    1
+WPE_EXPORT
+void
+wpe_view_backend_set_size_and_style(struct wpe_view_backend*, int width, int height, int style);
 
 WPE_EXPORT
 void
@@ -103,14 +110,18 @@ struct wpe_view_backend_client {
     void (*set_size)(void*, uint32_t, uint32_t);
     void (*frame_displayed)(void*);
     void (*activity_state_changed)(void*, uint32_t);
+    void (*quit_requested)(void*);
     void (*_wpe_reserved0)(void);
     void (*_wpe_reserved1)(void);
-    void (*_wpe_reserved2)(void);
 };
 
 WPE_EXPORT
 void
 wpe_view_backend_dispatch_set_size(struct wpe_view_backend*, uint32_t, uint32_t);
+
+WPE_EXPORT
+void
+wpe_view_backend_dispatch_set_style(struct wpe_view_backend*, uint32_t);
 
 WPE_EXPORT
 void
@@ -127,6 +138,10 @@ wpe_view_backend_remove_activity_state(struct wpe_view_backend*, uint32_t);
 WPE_EXPORT
 uint32_t
 wpe_view_backend_get_activity_state(struct wpe_view_backend*);
+
+WPE_EXPORT
+void
+wpe_view_backend_dispatch_quit_request(struct wpe_view_backend*);
 
 struct wpe_view_backend_input_client {
     void (*handle_keyboard_event)(void*, struct wpe_input_keyboard_event*);

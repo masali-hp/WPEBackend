@@ -55,6 +55,13 @@ wpe_view_backend_create_with_backend_interface(struct wpe_view_backend_interface
 }
 
 void
+wpe_view_backend_set_size_and_style(struct wpe_view_backend* backend, int width, int height, int style)
+{
+    backend->interface->set_size_and_style(backend->interface_data, width, height, style);
+}
+
+WPE_EXPORT
+void
 wpe_view_backend_destroy(struct wpe_view_backend* backend)
 {
     backend->interface->destroy(backend->interface_data);
@@ -146,6 +153,14 @@ wpe_view_backend_get_activity_state(struct wpe_view_backend* backend)
     return backend->activity_state;
 }
 
+void
+wpe_view_backend_dispatch_quit_request(struct wpe_view_backend* backend)
+{
+    if (backend->backend_client)
+        backend->backend_client->quit_requested(backend->backend_client_data);
+}
+
+WPE_EXPORT
 void
 wpe_view_backend_dispatch_keyboard_event(struct wpe_view_backend* backend, struct wpe_input_keyboard_event* event)
 {
